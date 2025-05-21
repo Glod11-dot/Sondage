@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SONDAGE</title>
+  <style>
+    body { font-family: Arial; padding: 20px; }
+    .hidden { display: none; }
+    .bold { font-weight: bold; font-size: 24px; margin-bottom: 20px; }
+    .page { margin-top: 20px; }
+    button { margin-top: 20px; }
+  </style>
+</head>
+<body>
+
+  <div id="page-accueil" class="page">
+    <div class="bold">SONDAGE</div>
+    <button onclick="nextPage(1)">Commencer</button>
+  </div>
+
+  <div id="page1" class="page hidden">
+    <h2>IDENTITÉ</h2>
+    <label>Noms: <input type="text" id="nom" /></label><br/>
+    <label>Âge:
+      <select id="age">
+        <option value="<18">&lt;18</option>
+        <option value="≈18">≈18</option>
+        <option value=">18">&gt;18</option>
+      </select>
+    </label><br/>
+    <label>Profession:
+      <select id="profession">
+        <option value="Étudiant">Étudiant</option>
+        <option value="Travailleur">Travailleur</option>
+        <option value="Sans emploi">Sans emploi</option>
+      </select>
+    </label><br/>
+    <label>Sexe:
+      <select id="sexe">
+        <option value="Homme">Homme</option>
+        <option value="Femme">Femme</option>
+        <option value="Autre">Autre</option>
+      </select>
+    </label><br/>
+    <label>État civil:
+      <select id="etat">
+        <option value="Célibataire">Célibataire</option>
+        <option value="Marié(e)">Marié(e)</option>
+      </select>
+    </label><br/>
+    <label>Niveau d’études:
+      <select id="etudes">
+        <option value="Primaire">Primaire</option>
+        <option value="Secondaire">Secondaire</option>
+        <option value="Universitaire">Universitaire</option>
+      </select>
+    </label><br/>
+    <button onclick="nextPage(2)">Suivant</button>
+  </div>
+
+  <div id="page2" class="page hidden">
+    <h2>Questions</h2>
+    <div id="questions"></div>
+    <button onclick="submitSondage()">Soumettre</button>
+  </div>
+
+  <div id="page3" class="page hidden">
+    <h2>Statistiques</h2>
+    <div id="stats"></div>
+    <button onclick="drawChart()">Voir le diagramme</button>
+  </div>
+
+  <div id="page4" class="page hidden">
+    <h2>Diagramme</h2>
+    <canvas id="chart" width="600" height="400"></canvas>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+    const questions = [
+      "1. Utilisez-vous les réseaux sociaux tous les jours ?",
+      "2. Passez-vous plus de 2 heures par jour sur les réseaux sociaux ?",
+      "3. Consultez-vous votre téléphone dès le réveil ?",
+      "4. Avez-vous essayé de réduire votre temps d’écran sans succès ?",
+      "5. Pensez-vous passer trop de temps sur les réseaux sociaux ?",
+      "6. Ressentez-vous de la fatigue après usage prolongé des écrans ?",
+      "7. Utilisez-vous les réseaux sociaux pendant les repas ?",
+      "8. Les réseaux sociaux vous empêchent-ils parfois de vous concentrer ?",
+      "9. Passez-vous du temps sur les réseaux sociaux au travail ou à l’école ?",
+      "10. Avez-vous supprimé une appli pour faire une pause ?"
+    ];
+
+    let reponses = [];
+    questions.forEach((q, i) => {
+      const div = document.createElement("div");
+      div.innerHTML = `<p>${q}</p>
+        <label><input type="radio" name="q${i}" value="Oui" required /> Oui</label>
+        <label><input type="radio" name="q${i}" value="Non" /> Non</label>`;
+      document.getElementById("questions").appendChild(div);
+    });
+
+    function nextPage(n) {
+      document.querySelectorAll('.page').forEach(p => p.classList.add('hidden'));
+      document.getElementById('page' + n).classList.remove('hidden');
+    }
+
+    function submitSondage() {
+      const identite = {
+        nom: document.getElementById("nom").value,
+        age: document.getElementById("age").value,
+        profession: document.getElementById("profession").value,
+        sexe: document.getElementById("sexe").value,
+        etat: document.getElementById("etat").value,
+        etudes: document.getElementById("etudes").value,
+      };
+      const reponses = questions.map((q, i) => {
+        const val = document.querySelector(`input[name="q${i}"]:checked`);
+        return val ? val.value : "Non";
+      });
+
+      const resultats = JSON.parse(localStorage.getItem("resultats") || "[]");
+      resultats.push({ identite, reponses });
+      localStorage.setItem("resultats", JSON.stringify(resultats));
+      nextPage(3);
+      afficherStats();
+    }
+
+    function afficherStats() {
+      const resultats = JSON.parse(localStorage.getItem("resultats") || "[]");
+      const statsDiv = document.getElementById("stats");
+      statsDiv.innerHTML = `<p>Nombre total de participants: ${resultats.length}</p>`;
+      
+      const totaux = Array(10).fill(0);
+      const parSexe = {}, parAge = {}, parProf = {};
+
+      resultats.forEach(r => {
+        r.reponses.forEach((rep, i) => { if (rep === "Oui") totaux[i]++; });
+
+        [parSexe, parAge, parProf].forEach((group, idx) => {
+          const key = idx === 0 ? r.identite.sexe : idx === 1 ? r.identite.age : r.identite.profession;
+          if (!group[key]) group[key] = { total: 0, oui: Array(10).fill(0) };
+          group[key].total++;
+          r.reponses.forEach((rep, i) => { if (rep === "Oui") group[key].oui[i]++; });
+        });
+      });
+
+      statsDiv.innerHTML += `<h3>Oui/Non totaux par question</h3><ul>${totaux.map((t, i) => `<li>Q${i+1}: Oui = ${t}, Non = ${resultats.length - t}</li>`).join("")}</ul>`;
+
+      function groupStats(title, group) {
+        let html = `<h3>${title}</h3>`;
+        for (let key in group) {
+          const g = group[key];
+          const moy = g.oui.reduce((a, b) => a + b, 0) / g.total;
+          html += `<p>${key} (moy. oui: ${moy.toFixed(2)})</p>`;
+        }
+        return html;
+      }
+
+      statsDiv.innerHTML += groupStats("Par sexe", parSexe);
+      statsDiv.innerHTML += groupStats("Par âge", parAge);
+      statsDiv.innerHTML += groupStats("Par profession", parProf);
+    }
+
+    function drawChart() {
+      nextPage(4);
+      const resultats = JSON.parse(localStorage.getItem("resultats") || "[]");
+      const moyennes = Array(10).fill(0);
+      resultats.forEach(r => {
+        r.reponses.forEach((rep, i) => { if (rep === "Oui") moyennes[i]++; });
+      });
+
+      const ctx = document.getElementById("chart").getContext("2d");
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: questions.map((q, i) => "Q" + (i + 1)),
+          datasets: [{
+            label: 'Moyenne des réponses "Oui"',
+            data: moyennes.map(m => (m / resultats.length).toFixed(2)),
+            backgroundColor: 'rgba(75, 192, 192, 0.6)'
+          }]
+        },
+        options: {
+          scales: {
+            y: {
+              beginAtZero: true,
+              max: 1
+            }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
